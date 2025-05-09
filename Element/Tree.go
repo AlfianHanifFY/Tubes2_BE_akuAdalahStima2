@@ -2,7 +2,7 @@ package Element
 
 import "strconv"
 
-// Struct pohon berbasis elemen
+// Struct pohon berbasis elemenU
 type Tree struct {
 	Root     Element
 	Children []Tree
