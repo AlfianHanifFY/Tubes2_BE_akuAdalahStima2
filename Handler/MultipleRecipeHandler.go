@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	dfs "stima-2-be/DFS"
+	"stima-2-be/Element"
 	"strconv"
 )
 
@@ -17,8 +18,8 @@ func MultipleRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println("Converted int:", count)
 	}
-
-	result := dfs.MultipleRecipe(name, count)
+	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
+	result := dfs.MultipleRecipe(name, recipeMap, count)
 
 	fmt.Print(result)
 
