@@ -1,0 +1,37 @@
+{
+    "root": "Brick",
+    "Left": "Mud",
+    "Right": "Fire",
+    "Tier": "2",
+    "children":[
+        {
+            "root": "Mud",
+            "Left": "Water",
+            "Right": "Earth",
+            "Tier": "1",
+            "children":[
+                {
+                    "root": "Water",
+                    "Left": "Heat",
+                    "Right": "Ice",
+                    "Tier": "0",
+                    "children":[]
+                  }, {
+                    "root": "Earth",
+                    "Left": "",
+                    "Right": "",
+                    "Tier": "0",
+                    "children":[]
+                  }
+
+            ]
+          },
+          {
+            "root": "Fire",
+            "Left": "Fire",
+            "Right": "Alcohol",
+            "Tier": "0",
+            "children": [] 
+          }
+    ]
+  }
