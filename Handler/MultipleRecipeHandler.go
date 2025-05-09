@@ -20,6 +20,8 @@ func MultipleRecipeHandler(w http.ResponseWriter, r *http.Request) {
 
 	result := dfs.MultipleRecipe(name, count)
 
+	fmt.Print(result)
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
