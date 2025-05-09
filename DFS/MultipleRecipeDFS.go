@@ -69,8 +69,7 @@ func buildTreeWithDepth(root string, recipeMap map[string][]Element.Element, vis
 	}
 }
 
-func MultipleRecipe(name string, count int) []Element.Tree {
-	recipeMap := Element.BuildRecipeMap()
+func MultipleRecipe(name string, recipeMap map[string][]Element.Element, count int) []Element.Tree {
 	var results []Element.Tree
 	recipes, exists := recipeMap[name]
 
@@ -143,3 +142,91 @@ func MultipleRecipe(name string, count int) []Element.Tree {
 
 	return results
 }
+
+// // Simple function to create a debug view of the tree
+// func printTree(t Element.Tree, indent string) {
+// 	fmt.Printf("%s%s (Tier: %s)\n", indent, t.Root.Root, t.Root.Tier)
+// 	if len(t.Children) > 0 {
+// 		for _, child := range t.Children {
+// 			printTree(child, indent+"  ")
+// 		}
+// 	}
+// }
+
+// func main() {
+// 	// Parse command line arguments
+// 	if len(os.Args) < 2 {
+// 		fmt.Println("Usage: program <filename> [target] [maxResults]")
+// 		fmt.Println("Example: program akuAdalahStima.json Dust 3")
+// 		os.Exit(1)
+// 	}
+
+// 	filename := os.Args[1]
+// 	target := "Dust" // Default target
+// 	maxResults := 3  // Default max results
+
+// 	if len(os.Args) > 2 {
+// 		target = os.Args[2]
+// 	}
+
+// 	if len(os.Args) > 3 {
+// 		fmt.Sscanf(os.Args[3], "%d", &maxResults)
+// 	}
+
+// 	// Add debug mode flag
+// 	debugMode := false
+// 	if len(os.Args) > 4 && strings.ToLower(os.Args[4]) == "debug" {
+// 		debugMode = true
+// 	}
+
+// 	fmt.Println("Loading recipes from:", filename)
+// 	fmt.Println("Target:", target)
+// 	fmt.Println("Max results:", maxResults)
+
+// 	err := Element.LoadElementsFromFile(filename)
+// 	if err != nil {
+// 		fmt.Println("Error loading recipes:", err)
+// 		os.Exit(1)
+// 	}
+
+// 	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
+
+// 	// Use the optimized approach to find combinations
+// 	fmt.Println("Building recipe trees...")
+// 	trees := MultipleRecipe(target, recipeMap, maxResults)
+
+// 	// Validate trees
+// 	validTrees := make([]Element.Tree, 0)
+// 	for _, tree := range trees {
+// 		if Element.ValidateTree(tree) {
+// 			validTrees = append(validTrees, tree)
+// 		}
+// 	}
+
+// 	if len(validTrees) == 0 {
+// 		fmt.Println("Warning: No valid trees found where all leaf nodes are base components")
+// 		// Fall back to original trees
+// 		validTrees = trees
+// 	} else {
+// 		fmt.Printf("Found %d valid trees where all leaf nodes are base components\n", len(validTrees))
+// 	}
+
+// 	if debugMode {
+// 		// Print tree structure for debugging
+// 		fmt.Println("\nTree structure:")
+// 		for i, tree := range validTrees {
+// 			fmt.Printf("Tree %d:\n", i+1)
+// 			printTree(tree, "")
+// 			fmt.Println()
+// 		}
+// 	} else {
+// 		// Output JSON
+// 		output, err := json.MarshalIndent(validTrees, "", "  ")
+// 		if err != nil {
+// 			fmt.Println("Error encoding result:", err)
+// 			return
+// 		}
+
+// 		fmt.Println(string(output))
+// 	}
+// }
