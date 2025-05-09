@@ -18,6 +18,10 @@ type Element struct {
 // Menyimpan semua elemen dari file agar tidak perlu load berulang
 var allElements []Element
 
+func GetAllElement() []Element {
+	return allElements
+}
+
 // Load dari file JSON hanya sekali
 func LoadElementsFromFile(filename string) error {
 	data, err := os.ReadFile(filename)
@@ -69,9 +73,9 @@ var BaseComponents = map[string]bool{
 }
 
 // Kelompokin berdasarkan rootnya
-func BuildRecipeMap() map[string][]Element {
+func BuildRecipeMap(recipes []Element) map[string][]Element {
 	recipeMap := make(map[string][]Element)
-	for _, r := range allElements {
+	for _, r := range recipes {
 		recipeMap[r.Root] = append(recipeMap[r.Root], r)
 	}
 	return recipeMap
