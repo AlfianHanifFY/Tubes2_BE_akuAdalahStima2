@@ -27,7 +27,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 func main() {
 	// Menambahkan CORS middleware ke handler
 
-	http.HandleFunc("/", enableCORS(handler.ScrapHandler))
+	http.HandleFunc("/Scrap", enableCORS(handler.ScrapHandler))
 	http.HandleFunc("/ShortestPath", enableCORS(handler.ShortestPathHandler))
 	http.HandleFunc("/TestTree", enableCORS(handler.TestTreeHandler))
 	http.HandleFunc("/BFS", enableCORS(handler.BFSHandler))
