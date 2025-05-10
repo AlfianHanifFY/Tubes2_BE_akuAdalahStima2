@@ -22,7 +22,7 @@ func MultipleRecipeHandler(w http.ResponseWriter, r *http.Request) {
 	result := dfs.MultipleRecipe(name, recipeMap, count)
 
 	fmt.Print(result)
-
+	fmt.Printf("Debug: DFS result=%v\n", result)
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)

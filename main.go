@@ -31,6 +31,7 @@ func main() {
 	http.HandleFunc("/ShortestPath", enableCORS(handler.ShortestPathHandler))
 	http.HandleFunc("/TestTree", enableCORS(handler.TestTreeHandler))
 	http.HandleFunc("/MultipleRecipe", enableCORS(handler.MultipleRecipeHandler))
+	http.HandleFunc("/MultipleRecipeBFS", enableCORS(handler.MultipleRecipeHandlerBFS))
 
 	// Jalankan server pada port 8080
 	fmt.Println("Server is running on http://localhost:8080")
