@@ -26,11 +26,13 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 	// Menambahkan CORS middleware ke handler
-	http.HandleFunc("/GetElement", enableCORS(handler.GetElementHandler))
-	http.HandleFunc("/scrap", enableCORS(handler.ScrapHandler))
+
+	http.HandleFunc("/", enableCORS(handler.ScrapHandler))
 	http.HandleFunc("/ShortestPath", enableCORS(handler.ShortestPathHandler))
 	http.HandleFunc("/TestTree", enableCORS(handler.TestTreeHandler))
 	http.HandleFunc("/MultipleRecipe", enableCORS(handler.MultipleRecipeHandler))
+	http.HandleFunc("/BFS", enableCORS(handler.BFSHandler))
+	http.HandleFunc("/DFS", enableCORS(handler.DFSHandler))
 
 	// Jalankan server pada port 8080
 	fmt.Println("Server is running on http://localhost:8080")
