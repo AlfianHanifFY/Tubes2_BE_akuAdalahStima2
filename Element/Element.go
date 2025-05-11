@@ -2,6 +2,7 @@ package Element
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -66,24 +67,25 @@ func (e Element) RightChildren() []Element {
 
 // Define base components, jika 'time' ga masuk
 var BaseComponents = map[string]bool{
-	"Air":   true,
-	"Earth": true,
-	"Fire":  true,
-	"Water": true,
+	"air":   true,
+	"earth": true,
+	"fire":  true,
+	"water": true,
+	"time":  true,
 }
 
 // Kelompokin berdasarkan rootnya
 func BuildRecipeMap(recipes []Element) map[string][]Element {
 	recipeMap := make(map[string][]Element)
 	for _, r := range recipes {
-		recipeMap[r.Root] = append(recipeMap[r.Root], r)
+		recipeMap[strings.ToLower(r.Root)] = append(recipeMap[strings.ToLower(r.Root)], r)
 	}
 	return recipeMap
 }
 
 // Check if an item is a base component
 func IsBaseComponent(item string) bool {
-	return BaseComponents[item]
+	return BaseComponents[strings.ToLower(item)]
 }
 
 // Check if all leaf nodes are base components
@@ -101,4 +103,10 @@ func ValidateTree(tree Tree) bool {
 	}
 
 	return true
+}
+
+func ParseTier(tierStr string) int {
+	var tier int
+	fmt.Sscanf(tierStr, "%d", &tier)
+	return tier
 }
