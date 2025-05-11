@@ -17,10 +17,17 @@ type MetricsResult struct {
 	DurationHuman string `json:"duration_human"`
 }
 
+func CountNodes(tree Element.Tree) int64 {
+	count := int64(1) // Count the root
+	for _, child := range tree.Children {
+		count += CountNodes(child)
+	}
+	return count
+}
+
 // Build a tree with depth limitation and ensuring base components as leaves
 // This maintains the original logic but is used for recursive calls
 func buildAllValidTrees(root string, recipeMap map[string][]Element.Element, visited map[string]bool, targetTier int, nodesVisited *int64) []Element.Tree {
-	atomic.AddInt64(nodesVisited, 1)
 	if Element.IsBaseComponent(root) {
 		return []Element.Tree{
 			{
@@ -60,23 +67,25 @@ func buildAllValidTrees(root string, recipeMap map[string][]Element.Element, vis
 
 		leftSubTrees := buildAllValidTrees(left, recipeMap, visited, tierInt, nodesVisited)
 		rightSubTrees := buildAllValidTrees(right, recipeMap, visited, tierInt, nodesVisited)
-
-		for _, left := range leftSubTrees {
-			for _, right := range rightSubTrees {
-				tree := Element.Tree{
-					Root: Element.Element{
-						Root:  root,
-						Left:  recipe.Left,
-						Right: recipe.Right,
-						Tier:  recipe.Tier,
-					},
-					Children: []Element.Tree{left, right},
+		if leftSubTrees != nil && rightSubTrees != nil && len(leftSubTrees) > 0 && len(rightSubTrees) > 0 {
+			// This node is successful in building valid trees
+			for _, left := range leftSubTrees {
+				for _, right := range rightSubTrees {
+					// atomic.AddInt64(nodesVisited, 1)
+					tree := Element.Tree{
+						Root: Element.Element{
+							Root:  root,
+							Left:  recipe.Left,
+							Right: recipe.Right,
+							Tier:  recipe.Tier,
+						},
+						Children: []Element.Tree{left, right},
+					}
+					trees = append(trees, tree)
 				}
-				trees = append(trees, tree)
 			}
 		}
 	}
-
 	return trees
 }
 
@@ -89,7 +98,6 @@ func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Elemen
 	recipes, exists := recipeMap[name]
 	if !exists {
 		if Element.IsBaseComponent(name) {
-			atomic.AddInt64(&nodesVisited, 1)
 			duration := time.Since(startTime)
 			metrics := MetricsResult{
 				NodesVisited:  nodesVisited,
@@ -176,6 +184,10 @@ func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Elemen
 
 					if int(atomic.LoadInt32(&done)) == 0 {
 						allTrees = append(allTrees, tree)
+						// Hanya tambah node jika tree valid ditambahkan
+						nodeCount := CountNodes(tree)
+						atomic.AddInt64(&nodesVisited, nodeCount)
+
 						if len(allTrees) >= count {
 							atomic.StoreInt32(&done, 1)
 						}
