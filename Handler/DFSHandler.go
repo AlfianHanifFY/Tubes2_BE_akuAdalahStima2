@@ -18,13 +18,16 @@ func DFSHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println("Converted int:", count)
 	}
+
 	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
-	result := dfs.MultipleRecipe(name, recipeMap, count)
+	result, info := dfs.MultipleRecipe(name, recipeMap, count)
 
 	fmt.Print(result)
 
+	response := []interface{}{info, result}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
 		fmt.Println("JSON encode error:", err)
 	}
