@@ -44,13 +44,17 @@ func BFSHandler(w http.ResponseWriter, r *http.Request) {
 	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
 
 	// Get recipes using BFS algorithm with multithreading
-	result := bfs.MultipleRecipesBFS(name, recipeMap, count)
+	// Using the new function that returns both trees and metrics
+	result, info := bfs.MultipleRecipe(name, recipeMap, count)
 
 	fmt.Printf("Debug: BFS result count=%d\n", len(result))
 
+	// Format the response to match DFS handler
+	response := []interface{}{info, result}
+
 	// Set content type and send response
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
 		fmt.Println("JSON encode error:", err)
 	}
