@@ -38,7 +38,8 @@ func getTierAsInt(tier string) int {
 
 // Build a tree using BFS approach with case-insensitive element names
 // Added tier validation and nodes visited counter
-func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited map[string]bool, nodesVisited *int64) Element.Tree {
+// Added a new parameter globalVisited to prevent redundant processing
+func buildTreeBFS(root string, recipeMap map[string][]Element.Element, branchVisited map[string]bool, globalVisited map[string]bool, nodesVisited *int64) Element.Tree {
 	// Increment nodes visited counter
 	atomic.AddInt64(nodesVisited, 1)
 	
@@ -58,9 +59,9 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 		}
 	}
 
-	// Check if already visited or no recipes available
-	// Use normalized name for the visited map
-	if visited[normalizedRoot] {
+	// Check if already visited in this branch or globally processed
+	// Use normalized name for the visited maps
+	if branchVisited[normalizedRoot] || globalVisited[normalizedRoot] {
 		return Element.Tree{
 			Root: Element.Element{
 				Root:  root, // Keep original casing for display
@@ -72,9 +73,12 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 		}
 	}
 
-	// Mark as visited to prevent cycles - use normalized name
-	visited[normalizedRoot] = true
-	defer func() { visited[normalizedRoot] = false }() // Unmark when done with this branch
+	// Mark as visited in this branch to prevent cycles - use normalized name
+	branchVisited[normalizedRoot] = true
+	defer func() { branchVisited[normalizedRoot] = false }() // Unmark when done with this branch
+	
+	// Mark as globally visited to prevent redundant processing
+	globalVisited[normalizedRoot] = true
 
 	// Find recipes for the current element - try both original and normalized names
 	var recipes []Element.Element
@@ -99,6 +103,8 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 	// Use the first recipe
 	recipe := recipes[0]
 
+	parentTier := getTierAsInt(recipe.Tier)
+
 	// Create node for current element
 	current := Element.Element{
 		Root:  root, // Keep original casing for display
@@ -108,8 +114,96 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 	}
 
 	// Process left and right children using BFS approach
-	leftTree := buildTreeBFS(recipe.Left, recipeMap, visited, nodesVisited)
-	rightTree := buildTreeBFS(recipe.Right, recipeMap, visited, nodesVisited)
+	// Only build child if it passes tier validation
+	var leftTree, rightTree Element.Tree
+	
+	// Process left child
+	leftNormalized := normalizeElementName(recipe.Left)
+	if !Element.IsBaseComponent(leftNormalized) && !branchVisited[leftNormalized] {
+		// Check tier first if available
+		leftChildTier := -1
+		if leftRecipes, exists := recipeMap[leftNormalized]; exists && len(leftRecipes) > 0 {
+			leftChildTier = getTierAsInt(leftRecipes[0].Tier)
+		}
+		
+		// Only build if tier validation passes or tier is unknown
+		if leftChildTier == -1 || leftChildTier < parentTier {
+			leftTree = buildTreeBFS(recipe.Left, recipeMap, branchVisited, globalVisited, nodesVisited)
+		} else {
+			// If tier validation fails, create a simpler tree node
+			leftTree = Element.Tree{
+				Root: Element.Element{
+					Root:  recipe.Left,
+					Left:  "",
+					Right: "",
+					Tier:  strconv.Itoa(leftChildTier),
+				},
+				Children: nil,
+			}
+			fmt.Printf("TIER SKIPPED: %s (Tier %d) has child %s (Tier %d) with equal/higher tier\n", 
+				root, parentTier, recipe.Left, leftChildTier)
+		}
+	} else {
+		// For base components or already visited branches
+		leftTree = Element.Tree{
+			Root: Element.Element{
+				Root:  recipe.Left,
+				Left:  "",
+				Right: "",
+				Tier:  func() string {
+					if Element.IsBaseComponent(leftNormalized) {
+						return "0"
+					}
+					return ""
+				}(),
+			},
+			Children: nil,
+		}
+	}
+	
+	// Process right child
+	rightNormalized := normalizeElementName(recipe.Right)
+	if !Element.IsBaseComponent(rightNormalized) && !branchVisited[rightNormalized] {
+		// Check tier first if available
+		rightChildTier := -1
+		if rightRecipes, exists := recipeMap[rightNormalized]; exists && len(rightRecipes) > 0 {
+			rightChildTier = getTierAsInt(rightRecipes[0].Tier)
+		}
+		
+		// Only build if tier validation passes or tier is unknown
+		if rightChildTier == -1 || rightChildTier < parentTier {
+			rightTree = buildTreeBFS(recipe.Right, recipeMap, branchVisited, globalVisited, nodesVisited)
+		} else {
+			// If tier validation fails, create a simpler tree node
+			rightTree = Element.Tree{
+				Root: Element.Element{
+					Root:  recipe.Right,
+					Left:  "",
+					Right: "",
+					Tier:  strconv.Itoa(rightChildTier),
+				},
+				Children: nil,
+			}
+			fmt.Printf("TIER SKIPPED: %s (Tier %d) has child %s (Tier %d) with equal/higher tier\n", 
+				root, parentTier, recipe.Right, rightChildTier)
+		}
+	} else {
+		// For base components or already visited branches
+		rightTree = Element.Tree{
+			Root: Element.Element{
+				Root:  recipe.Right,
+				Left:  "",
+				Right: "",
+				Tier:  func() string {
+					if Element.IsBaseComponent(rightNormalized) {
+						return "0"
+					}
+					return ""
+				}(),
+			},
+			Children: nil,
+		}
+	}
 
 	// Create tree with this recipe as root
 	result := Element.Tree{
@@ -117,53 +211,11 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 		Children: []Element.Tree{leftTree, rightTree},
 	}
 
-	// Validate tier consistency
-	validateTierConsistency(result)
-
 	return result
 }
 
-// Function to validate tier consistency
-func validateTierConsistency(tree Element.Tree) bool {
-	if (tree.Children == nil) {
-		return true
-	}
-
-	parentTierStr := tree.Root.Tier
-	parentTier := getTierAsInt(parentTierStr)
-	consistent := true
-
-	for _, child := range tree.Children {
-		// Skip base components
-		if child.Root.Tier == "0" {
-			continue
-		}
-
-		childTier := getTierAsInt(child.Root.Tier)
-		
-		// Skip if child tier is unknown (-1)
-		if childTier == -1 {
-			continue
-		}
-
-		// Detect tier anomaly: child tier > parent tier
-		if childTier > parentTier {
-			fmt.Printf("ANOMALI TIER: %s (Tier %s) memiliki child %s (Tier %s) dengan tier lebih tinggi\n", 
-				tree.Root.Root, tree.Root.Tier, 
-				child.Root.Root, child.Root.Tier)
-			consistent = false
-		}
-
-		// Recurse for children
-		childConsistent := validateTierConsistency(child)
-		consistent = consistent && childConsistent
-	}
-
-	return consistent
-}
-
 // MultipleRecipesBFS returns multiple recipe trees using BFS with multithreading support
-// Now with tier validation and metrics tracking like the DFS implementation
+// Now with tier validation, redundancy prevention and metrics tracking
 func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
 	startTime := time.Now()
 	var nodesVisited int64 = 0
@@ -240,6 +292,7 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 	// Use WaitGroup for synchronization
 	var wg sync.WaitGroup
 	var mutex sync.Mutex // To protect concurrent writes to results slice
+	globalProcessedMap := make(map[string]bool) // Shared map to prevent redundant processing
 
 	// Process each recipe in parallel
 	for i := 0; i < now; i++ {
@@ -249,7 +302,17 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 		go func(recipe Element.Element, index int) {
 			defer wg.Done()
 			
-			visited := make(map[string]bool) // Create new visited map for each recipe
+			// Create new visited map for this branch to track cycles
+			branchVisited := make(map[string]bool) 
+			
+			// Create thread-local copy of global processed map
+			var localGlobalProcessed map[string]bool
+			mutex.Lock()
+			localGlobalProcessed = make(map[string]bool, len(globalProcessedMap))
+			for k, v := range globalProcessedMap {
+				localGlobalProcessed[k] = v
+			}
+			mutex.Unlock()
 
 			rootElement := Element.Element{
 				Root:  name,
@@ -260,10 +323,91 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 
 			// Increment nodes visited counter for root
 			atomic.AddInt64(&nodesVisited, 1)
+			
+			parentTier := getTierAsInt(recipe.Tier)
 
-			// Build left and right subtrees using BFS
-			leftTree := buildTreeBFS(recipe.Left, normalizedRecipeMap, visited, &nodesVisited)
-			rightTree := buildTreeBFS(recipe.Right, normalizedRecipeMap, visited, &nodesVisited)
+			// Process left child with tier validation
+			leftNormalized := normalizeElementName(recipe.Left)
+			var leftTree Element.Tree
+			if !Element.IsBaseComponent(leftNormalized) {
+				// Check tier first if available
+				leftChildTier := -1
+				if leftRecipes, exists := normalizedRecipeMap[leftNormalized]; exists && len(leftRecipes) > 0 {
+					leftChildTier = getTierAsInt(leftRecipes[0].Tier)
+				}
+				
+				// Only build if tier validation passes or tier is unknown
+				if leftChildTier == -1 || leftChildTier < parentTier {
+					leftTree = buildTreeBFS(recipe.Left, normalizedRecipeMap, branchVisited, localGlobalProcessed, &nodesVisited)
+				} else {
+					// If tier validation fails, create a simpler tree node
+					leftTree = Element.Tree{
+						Root: Element.Element{
+							Root:  recipe.Left,
+							Left:  "",
+							Right: "",
+							Tier:  strconv.Itoa(leftChildTier),
+						},
+						Children: nil,
+					}
+					fmt.Printf("TIER SKIPPED: %s (Tier %d) has child %s (Tier %d) with equal/higher tier\n", 
+						name, parentTier, recipe.Left, leftChildTier)
+				}
+			} else {
+				// For base components
+				leftTree = Element.Tree{
+					Root: Element.Element{
+						Root:  recipe.Left,
+						Left:  "",
+						Right: "",
+						Tier:  "0",
+					},
+					Children: nil,
+				}
+			}
+			
+			// Reset branch visited for right side
+			branchVisited = make(map[string]bool)
+			
+			// Process right child with tier validation
+			rightNormalized := normalizeElementName(recipe.Right)
+			var rightTree Element.Tree
+			if !Element.IsBaseComponent(rightNormalized) {
+				// Check tier first if available
+				rightChildTier := -1
+				if rightRecipes, exists := normalizedRecipeMap[rightNormalized]; exists && len(rightRecipes) > 0 {
+					rightChildTier = getTierAsInt(rightRecipes[0].Tier)
+				}
+				
+				// Only build if tier validation passes or tier is unknown
+				if rightChildTier == -1 || rightChildTier < parentTier {
+					rightTree = buildTreeBFS(recipe.Right, normalizedRecipeMap, branchVisited, localGlobalProcessed, &nodesVisited)
+				} else {
+					// If tier validation fails, create a simpler tree node
+					rightTree = Element.Tree{
+						Root: Element.Element{
+							Root:  recipe.Right,
+							Left:  "",
+							Right: "",
+							Tier:  strconv.Itoa(rightChildTier),
+						},
+						Children: nil,
+					}
+					fmt.Printf("TIER SKIPPED: %s (Tier %d) has child %s (Tier %d) with equal/higher tier\n", 
+						name, parentTier, recipe.Right, rightChildTier)
+				}
+			} else {
+				// For base components
+				rightTree = Element.Tree{
+					Root: Element.Element{
+						Root:  recipe.Right,
+						Left:  "",
+						Right: "",
+						Tier:  "0",
+					},
+					Children: nil,
+				}
+			}
 
 			// Create tree with this recipe as root
 			tree := Element.Tree{
@@ -271,11 +415,13 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 				Children: []Element.Tree{leftTree, rightTree},
 			}
 			
-			// Validate tier consistency for this tree
-			validateTierConsistency(tree)
-			
-			// Safely append to results
+			// Update global processed map with the new processed elements
 			mutex.Lock()
+			for k, v := range localGlobalProcessed {
+				if v {
+					globalProcessedMap[k] = true
+				}
+			}
 			results = append(results, tree)
 			mutex.Unlock()
 			
