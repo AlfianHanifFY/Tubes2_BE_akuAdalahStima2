@@ -5,8 +5,18 @@ import (
 	"strings"
 	"stima-2-be/Element"
 	"sync"
+	"sync/atomic"
 	"strconv"
+	"time"
 )
+
+// MetricsResult holds the performance metrics for the tree building process
+// This matches the DFS implementation for consistency
+type MetricsResult struct {
+	NodesVisited  int64  `json:"nodes_visited"`
+	Duration      int64  `json:"duration_ms"`
+	DurationHuman string `json:"duration_human"`
+}
 
 // normalizeElementName normalizes element names to handle case sensitivity
 // This ensures that elements like "Water" and "water" are treated the same
@@ -27,8 +37,11 @@ func getTierAsInt(tier string) int {
 }
 
 // Build a tree using BFS approach with case-insensitive element names
-// Added tier validation
-func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited map[string]bool) Element.Tree {
+// Added tier validation and nodes visited counter
+func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited map[string]bool, nodesVisited *int64) Element.Tree {
+	// Increment nodes visited counter
+	atomic.AddInt64(nodesVisited, 1)
+	
 	// Normalize the root name for case-insensitive comparison
 	normalizedRoot := normalizeElementName(root)
 	
@@ -95,8 +108,8 @@ func buildTreeBFS(root string, recipeMap map[string][]Element.Element, visited m
 	}
 
 	// Process left and right children using BFS approach
-	leftTree := buildTreeBFS(recipe.Left, recipeMap, visited)
-	rightTree := buildTreeBFS(recipe.Right, recipeMap, visited)
+	leftTree := buildTreeBFS(recipe.Left, recipeMap, visited, nodesVisited)
+	rightTree := buildTreeBFS(recipe.Right, recipeMap, visited, nodesVisited)
 
 	// Create tree with this recipe as root
 	result := Element.Tree{
@@ -150,8 +163,11 @@ func validateTierConsistency(tree Element.Tree) bool {
 }
 
 // MultipleRecipesBFS returns multiple recipe trees using BFS with multithreading support
-// Now with tier validation
-func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, count int) []Element.Tree {
+// Now with tier validation and metrics tracking like the DFS implementation
+func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
+	startTime := time.Now()
+	var nodesVisited int64 = 0
+	
 	// Create case-insensitive recipe map
 	normalizedRecipeMap := make(map[string][]Element.Element)
 	
@@ -175,12 +191,17 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 			recipes = r
 		}
 	}
-	
-	fmt.Printf("Debug: name=%s, normalized=%s, count=%d\n", name, normalizeElementName(name), count)
 
 	if len(recipes) == 0 {
 		// If target is a base component, return it as tier 0
 		if Element.IsBaseComponent(name) || Element.IsBaseComponent(normalizeElementName(name)) {
+			atomic.AddInt64(&nodesVisited, 1)
+			duration := time.Since(startTime)
+			metrics := MetricsResult{
+				NodesVisited:  nodesVisited,
+				Duration:      duration.Milliseconds(),
+				DurationHuman: duration.String(),
+			}
 			return []Element.Tree{{
 				Root: Element.Element{
 					Root:  name,
@@ -189,10 +210,16 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 					Tier:  "0",
 				},
 				Children: nil,
-			}}
+			}}, metrics
 		}
 
 		// Otherwise return as unknown tier
+		duration := time.Since(startTime)
+		metrics := MetricsResult{
+			NodesVisited:  nodesVisited,
+			Duration:      duration.Milliseconds(),
+			DurationHuman: duration.String(),
+		}
 		return []Element.Tree{{
 			Root: Element.Element{
 				Root:  name,
@@ -201,7 +228,7 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 				Tier:  "",
 			},
 			Children: nil,
-		}}
+		}}, metrics
 	}
 
 	// Limit the number of recipes we consider
@@ -231,9 +258,12 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 				Tier:  recipe.Tier,
 			}
 
+			// Increment nodes visited counter for root
+			atomic.AddInt64(&nodesVisited, 1)
+
 			// Build left and right subtrees using BFS
-			leftTree := buildTreeBFS(recipe.Left, normalizedRecipeMap, visited)
-			rightTree := buildTreeBFS(recipe.Right, normalizedRecipeMap, visited)
+			leftTree := buildTreeBFS(recipe.Left, normalizedRecipeMap, visited, &nodesVisited)
+			rightTree := buildTreeBFS(recipe.Right, normalizedRecipeMap, visited, &nodesVisited)
 
 			// Create tree with this recipe as root
 			tree := Element.Tree{
@@ -255,38 +285,29 @@ func MultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, cou
 	// Wait for all goroutines to complete
 	wg.Wait()
 
-	// Validate trees to ensure all leaf nodes are base components
-	var validTrees []Element.Tree
-	for _, tree := range results {
-		if Element.ValidateTree(tree) {
-			validTrees = append(validTrees, tree)
-		} else {
-			fmt.Printf("Tree is invalid: %v\n", tree.Root)
-		}
+	// Calculate metrics
+	duration := time.Since(startTime)
+	metrics := MetricsResult{
+		NodesVisited:  nodesVisited,
+		Duration:      duration.Milliseconds(),
+		DurationHuman: duration.String(),
 	}
 
-	if len(validTrees) == 0 {
-		fmt.Println("Warning: No valid trees found where all leaf nodes are base components")
-		return results // Return all results even if none are valid (same as DFS implementation)
-	} else {
-		fmt.Printf("Found %d valid trees where all leaf nodes are base components (BFS)\n", len(validTrees))
-	}
-
-	return results // Return all results (same as DFS implementation)
+	return results, metrics
 }
 
-// SimpleMultipleRecipesBFS is a non-multithreaded version that follows the same pattern as DFS
-// Now with tier validation
-func SimpleMultipleRecipesBFS(name string, recipeMap map[string][]Element.Element, count int) []Element.Tree {
-	var results []Element.Tree
-	recipes, exists := recipeMap[name]
-	
-	fmt.Printf("Debug: name=%s, count=%d\n", name, count)
-
-	if !exists || len(recipes) == 0 {
-		// If target is a base component, return it as tier 0
-		if Element.IsBaseComponent(name) {
-			return []Element.Tree{{
+// Wrapper function for backward compatibility, similar to DFS implementation
+func MultipleRecipe(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
+	if Element.IsBaseComponent(name) {
+		startTime := time.Now()
+		duration := time.Since(startTime)
+		metrics := MetricsResult{
+			NodesVisited:  1,
+			Duration:      duration.Milliseconds(),
+			DurationHuman: duration.String(),
+		}
+		return []Element.Tree{
+			{
 				Root: Element.Element{
 					Root:  name,
 					Left:  "",
@@ -294,69 +315,18 @@ func SimpleMultipleRecipesBFS(name string, recipeMap map[string][]Element.Elemen
 					Tier:  "0",
 				},
 				Children: nil,
-			}}
-		}
-
-		// Otherwise return as unknown tier
-		return []Element.Tree{{
-			Root: Element.Element{
-				Root:  name,
-				Left:  "",
-				Right: "",
-				Tier:  "",
 			},
-			Children: nil,
-		}}
+		}, metrics
 	}
+	return MultipleRecipesBFS(name, recipeMap, count)
+}
 
-	// Limit the number of recipes we consider
-	now := len(recipes)
-	if now > count {
-		now = count
-	}
-
-	for i := 0; i < now; i++ {
-		recipe := recipes[i]
-		visited := make(map[string]bool)
-
-		rootElement := Element.Element{
-			Root:  name,
-			Left:  recipe.Left,
-			Right: recipe.Right,
-			Tier:  recipe.Tier,
-		}
-
-		// Build left and right subtrees using BFS
-		leftTree := buildTreeBFS(recipe.Left, recipeMap, visited)
-		rightTree := buildTreeBFS(recipe.Right, recipeMap, visited)
-
-		// Create tree with this recipe as root
-		tree := Element.Tree{
-			Root:     rootElement,
-			Children: []Element.Tree{leftTree, rightTree},
-		}
-		
-		// Validate tier consistency
-		validateTierConsistency(tree)
-		
-		results = append(results, tree)
-	}
-
-	// Validate trees to ensure all leaf nodes are base components
-	validTrees := make([]Element.Tree, 0)
-	for _, tree := range results {
-		if Element.ValidateTree(tree) {
-			validTrees = append(validTrees, tree)
-		} else {
-			fmt.Printf("Tree is invalid: %v\n", tree.Root)
+// Simple function to create a debug view of the tree, similar to DFS implementation
+func PrintTree(t Element.Tree, indent string) {
+	fmt.Printf("%s%s (Tier: %s)\n", indent, t.Root.Root, t.Root.Tier)
+	if len(t.Children) > 0 {
+		for _, child := range t.Children {
+			PrintTree(child, indent+"  ")
 		}
 	}
-
-	if len(validTrees) == 0 {
-		fmt.Println("Warning: No valid trees found where all leaf nodes are base components")
-	} else {
-		fmt.Printf("Found %d valid trees where all leaf nodes are base components (BFS)\n", len(validTrees))
-	}
-
-	return results // Return all results (same as DFS implementation)
 }
