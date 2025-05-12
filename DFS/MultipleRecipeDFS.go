@@ -51,6 +51,10 @@ func buildAllValidTrees(root string, recipeMap map[string][]Element.Element, vis
 		return nil
 	}
 
+	if root == "time" {
+		return nil
+	}
+
 	var trees []Element.Tree
 	visited[root] = true
 	defer func() { visited[root] = false }()
