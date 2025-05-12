@@ -3,11 +3,11 @@ package bfs
 import (
 	"fmt"
 	"runtime"
+	"stima-2-be/Element"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-	"stima-2-be/Element"
 )
 
 // MetricsResult holds the performance metrics for the tree building process
@@ -27,7 +27,7 @@ func BuildAllValidTreesFIFO(root string, recipeMap map[string][]Element.Element,
 	runtime.GOMAXPROCS(runtime.NumCPU()) // Use all available cores
 
 	var results []Element.Tree
-	var mu sync.Mutex                    // Protects access to `results`
+	var mu sync.Mutex // Protects access to results
 	queue := []Node{
 		{
 			Root:    root,
@@ -136,18 +136,18 @@ func MultipleRecipesBFSFIFO(name string, recipeMap map[string][]Element.Element,
 		atomic.AddInt64(&nodesVisited, 1)
 		duration := time.Since(startTime)
 		return []Element.Tree{{
-			Root: Element.Element{
-				Root:  name,
-				Left:  "",
-				Right: "",
-				Tier:  "0",
-			},
-			Children: nil,
-		}}, MetricsResult{
-			NodesVisited:  nodesVisited,
-			Duration:      duration.Milliseconds(),
-			DurationHuman: duration.String(),
-		}
+				Root: Element.Element{
+					Root:  name,
+					Left:  "",
+					Right: "",
+					Tier:  "0",
+				},
+				Children: nil,
+			}}, MetricsResult{
+				NodesVisited:  nodesVisited,
+				Duration:      duration.Milliseconds(),
+				DurationHuman: duration.String(),
+			}
 	}
 
 	trees := BuildAllValidTreesFIFO(name, recipeMap, 9999, &nodesVisited)
