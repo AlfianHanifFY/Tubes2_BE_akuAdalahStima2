@@ -2,7 +2,7 @@ package bfs
 
 import (
 	"fmt"
-	"runtime"
+	"math"
 	"stima-2-be/Element"
 	"strings"
 	"sync"
@@ -10,132 +10,155 @@ import (
 	"time"
 )
 
-// MetricsResult holds the performance metrics for the tree building process
 type MetricsResult struct {
 	NodesVisited  int64  `json:"nodes_visited"`
 	Duration      int64  `json:"duration_ms"`
 	DurationHuman string `json:"duration_human"`
 }
 
-func BuildAllValidTreesFIFO(root string, recipeMap map[string][]Element.Element, targetTier int, nodesVisited *int64) []Element.Tree {
-	type Node struct {
-		Root    string
-		Tier    int
-		Visited map[string]bool
+type Queue struct {
+	items []string
+}
+
+func (q *Queue) Enqueue(item string) {
+	q.items = append(q.items, item)
+}
+
+func (q *Queue) Dequeue() string {
+	if len(q.items) == 0 {
+		return ""
 	}
+	item := q.items[0]
+	q.items = q.items[1:]
+	return item
+}
 
-	runtime.GOMAXPROCS(runtime.NumCPU()) // Use all available cores
+func (q *Queue) IsEmpty() bool {
+	return len(q.items) == 0
+}
 
-	var results []Element.Tree
-	var mu sync.Mutex // Protects access to results
-	queue := []Node{
-		{
-			Root:    root,
-			Tier:    targetTier,
-			Visited: map[string]bool{},
-		},
+func cloneMap(original map[string]bool) map[string]bool {
+	copy := make(map[string]bool)
+	for k, v := range original {
+		copy[k] = v
 	}
+	return copy
+}
 
-	var wg sync.WaitGroup
-	// Protects access to queue if needed later (not used here)
+func buildTreesControlled(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
+	atomic.AddInt64(nodesVisited, 1)
 
-	for len(queue) > 0 {
-		curr := queue[0]
-		queue = queue[1:]
+	fmt.Printf("[DEBUG] Visiting: %s (Nodes Visited: %d)\n", root, *nodesVisited)
 
-		atomic.AddInt64(nodesVisited, 1)
-
-		normalizedRoot := strings.ToLower(curr.Root)
-		if Element.IsBaseComponent(normalizedRoot) {
-			mu.Lock()
-			results = append(results, Element.Tree{
+	if Element.IsBaseComponent(root) {
+		return []Element.Tree{
+			{
 				Root: Element.Element{
-					Root:  curr.Root,
+					Root:  root,
 					Left:  "",
 					Right: "",
 					Tier:  "0",
 				},
 				Children: nil,
-			})
-			mu.Unlock()
-			continue
-		}
-
-		if curr.Visited[normalizedRoot] {
-			continue
-		}
-
-		recipes, exists := recipeMap[normalizedRoot]
-		if !exists {
-			continue
-		}
-
-		for _, recipe := range recipes {
-			tierInt := Element.ParseTier(recipe.Tier)
-			if tierInt >= curr.Tier {
-				continue
-			}
-
-			visitedCopy := make(map[string]bool)
-			for k, v := range curr.Visited {
-				visitedCopy[k] = v
-			}
-			visitedCopy[normalizedRoot] = true
-
-			wg.Add(1)
-			go func(recipe Element.Element, visited map[string]bool) {
-				defer wg.Done()
-
-				// Local counter for each thread
-				var localVisited int64 = 0
-
-				leftSubTrees := BuildAllValidTreesFIFO(recipe.Left, recipeMap, Element.ParseTier(recipe.Tier), &localVisited)
-				rightSubTrees := BuildAllValidTreesFIFO(recipe.Right, recipeMap, Element.ParseTier(recipe.Tier), &localVisited)
-
-				if len(leftSubTrees) == 0 || len(rightSubTrees) == 0 {
-					return
-				}
-
-				localTrees := make([]Element.Tree, 0, len(leftSubTrees)*len(rightSubTrees))
-				for _, lt := range leftSubTrees {
-					for _, rt := range rightSubTrees {
-						tree := Element.Tree{
-							Root: Element.Element{
-								Root:  recipe.Root,
-								Left:  recipe.Left,
-								Right: recipe.Right,
-								Tier:  recipe.Tier,
-							},
-							Children: []Element.Tree{lt, rt},
-						}
-						localTrees = append(localTrees, tree)
-					}
-				}
-
-				// Append to shared result with mutex
-				mu.Lock()
-				results = append(results, localTrees...)
-				mu.Unlock()
-
-				atomic.AddInt64(nodesVisited, localVisited)
-			}(recipe, visitedCopy)
+			},
 		}
 	}
 
-	wg.Wait()
-	return results
+	if visited[root] {
+		return nil
+	}
+
+	recipes, exists := recipeMap[strings.ToLower(root)]
+	if !exists || root == "time" {
+		return nil
+	}
+
+	var result []Element.Tree
+	queue := &Queue{}
+	queue.Enqueue(root)
+
+	visited = cloneMap(visited)
+	visited[root] = true
+
+	for !queue.IsEmpty() {
+		current := queue.Dequeue()
+		recipes, _ = recipeMap[strings.ToLower(current)]
+
+		fmt.Printf("[DEBUG] Current element: %s\n", current)
+
+		for _, recipe := range recipes {
+			tierInt := Element.ParseTier(recipe.Tier)
+			if tierInt >= tierLimit {
+				fmt.Printf("[DEBUG] Skipping %s due to tier limit\n", recipe.Tier)
+				continue
+			}
+
+			left := strings.ToLower(recipe.Left)
+			right := strings.ToLower(recipe.Right)
+
+			var leftTrees, rightTrees []Element.Tree
+			var wg sync.WaitGroup
+
+			leftChan := make(chan []Element.Tree, 1)
+			rightChan := make(chan []Element.Tree, 1)
+
+			wg.Add(2)
+
+			// Goroutine untuk kiri
+			go func() {
+				defer wg.Done()
+				leftChan <- buildTreesControlled(left, recipeMap, cloneMap(visited), tierInt, limit, nodesVisited)
+			}()
+
+			// Goroutine untuk kanan
+			go func() {
+				defer wg.Done()
+				// Tunggu hasil kiri dulu untuk hitung right limit
+				lefts := <-leftChan
+				if len(lefts) == 0 {
+					rightChan <- nil
+					leftTrees = lefts
+					return
+				}
+				rightLimit := int(math.Ceil(float64(limit) / float64(len(lefts))))
+				rightChan <- buildTreesControlled(right, recipeMap, cloneMap(visited), tierInt, rightLimit, nodesVisited)
+				leftTrees = lefts
+			}()
+
+			wg.Wait()
+			rightTrees = <-rightChan
+
+			if len(leftTrees) == 0 || len(rightTrees) == 0 {
+				continue
+			}
+
+			for _, lt := range leftTrees {
+				for _, rt := range rightTrees {
+					tree := Element.Tree{
+						Root:     recipe,
+						Children: []Element.Tree{lt, rt},
+					}
+					result = append(result, tree)
+					if len(result) >= limit {
+						return result
+					}
+				}
+			}
+		}
+	}
+
+	return result
 }
 
-func MultipleRecipesBFSFIFO(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
+func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
 	startTime := time.Now()
 	var nodesVisited int64 = 0
 
-	normalizedName := strings.ToLower(name)
-
-	if Element.IsBaseComponent(normalizedName) {
-		atomic.AddInt64(&nodesVisited, 1)
-		duration := time.Since(startTime)
-		return []Element.Tree{{
+	name = strings.ToLower(name)
+	var trees []Element.Tree
+	if Element.IsBaseComponent(name) {
+		trees = []Element.Tree{
+			{
 				Root: Element.Element{
 					Root:  name,
 					Left:  "",
@@ -143,28 +166,27 @@ func MultipleRecipesBFSFIFO(name string, recipeMap map[string][]Element.Element,
 					Tier:  "0",
 				},
 				Children: nil,
-			}}, MetricsResult{
-				NodesVisited:  nodesVisited,
-				Duration:      duration.Milliseconds(),
-				DurationHuman: duration.String(),
-			}
+			},
+		}
+		nodesVisited = 1
+	} else {
+		trees = buildTreesControlled(name, recipeMap, map[string]bool{}, math.MaxInt32, count, &nodesVisited)
 	}
 
-	trees := BuildAllValidTreesFIFO(name, recipeMap, 9999, &nodesVisited)
 	if len(trees) > count {
 		trees = trees[:count]
 	}
-
 	duration := time.Since(startTime)
-	return trees, MetricsResult{
+	metrics := MetricsResult{
 		NodesVisited:  nodesVisited,
 		Duration:      duration.Milliseconds(),
 		DurationHuman: duration.String(),
 	}
+	return trees, metrics
 }
 
 func MultipleRecipe(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
-	return MultipleRecipesBFSFIFO(name, recipeMap, count)
+	return MultipleRecipeConcurrent(name, recipeMap, count)
 }
 
 func PrintTree(t Element.Tree, indent string) {
