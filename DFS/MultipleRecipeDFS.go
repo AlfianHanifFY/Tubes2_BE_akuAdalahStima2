@@ -17,6 +17,14 @@ type MetricsResult struct {
 	DurationHuman string `json:"duration_human"`
 }
 
+func CountNodes(tree Element.Tree) int64 {
+	count := int64(1) // Count the root
+	for _, child := range tree.Children {
+		count += CountNodes(child)
+	}
+	return count
+}
+
 func buildTreesControlled(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
 	atomic.AddInt64(nodesVisited, 1)
 	if Element.IsBaseComponent(root) {
