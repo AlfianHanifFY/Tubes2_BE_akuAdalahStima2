@@ -45,7 +45,7 @@ func cloneMap(original map[string]bool) map[string]bool {
 	return copy
 }
 
-func buildTreesControlled(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
+func buildTreesBFS(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
 	atomic.AddInt64(nodesVisited, 1)
 
 	fmt.Printf("[DEBUG] Visiting: %s (Nodes Visited: %d)\n", root, *nodesVisited)
@@ -86,6 +86,7 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 
 		fmt.Printf("[DEBUG] Current element: %s\n", current)
 
+		// Process all recipes for the current element (root at each level)
 		for _, recipe := range recipes {
 			tierInt := Element.ParseTier(recipe.Tier)
 			if tierInt >= tierLimit {
@@ -107,7 +108,7 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 			// Goroutine untuk kiri
 			go func() {
 				defer wg.Done()
-				leftChan <- buildTreesControlled(left, recipeMap, cloneMap(visited), tierInt, limit, nodesVisited)
+				leftChan <- buildTreesBFS(left, recipeMap, cloneMap(visited), tierInt, limit, nodesVisited)
 			}()
 
 			// Goroutine untuk kanan
@@ -121,7 +122,7 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 					return
 				}
 				rightLimit := int(math.Ceil(float64(limit) / float64(len(lefts))))
-				rightChan <- buildTreesControlled(right, recipeMap, cloneMap(visited), tierInt, rightLimit, nodesVisited)
+				rightChan <- buildTreesBFS(right, recipeMap, cloneMap(visited), tierInt, rightLimit, nodesVisited)
 				leftTrees = lefts
 			}()
 
@@ -143,6 +144,20 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 						return result
 					}
 				}
+			}
+		}
+
+		// Enqueue the child nodes for BFS traversal
+		for _, recipe := range recipes {
+			left := strings.ToLower(recipe.Left)
+			right := strings.ToLower(recipe.Right)
+			if !visited[left] {
+				queue.Enqueue(left)
+				visited[left] = true
+			}
+			if !visited[right] {
+				queue.Enqueue(right)
+				visited[right] = true
 			}
 		}
 	}
@@ -170,7 +185,7 @@ func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Elemen
 		}
 		nodesVisited = 1
 	} else {
-		trees = buildTreesControlled(name, recipeMap, map[string]bool{}, math.MaxInt32, count, &nodesVisited)
+		trees = buildTreesBFS(name, recipeMap, map[string]bool{}, math.MaxInt32, count, &nodesVisited)
 	}
 
 	if len(trees) > count {
