@@ -22,7 +22,7 @@ func BFSHandler(w http.ResponseWriter, r *http.Request) {
 	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
 	result, info := bfs.MultipleRecipe(name, recipeMap, count)
 
-	fmt.Print(result)
+	Element.AreAllTreesUnique(result)
 
 	response := []interface{}{info, result}
 
