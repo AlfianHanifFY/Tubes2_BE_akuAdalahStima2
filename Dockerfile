@@ -8,4 +8,4 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Jangan build saat build image — biar runtime-nya go run
-CMD ["go", "run", "main.go"]
+CMD ["go", "run", "api/index.go"]
