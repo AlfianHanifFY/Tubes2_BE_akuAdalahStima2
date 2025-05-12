@@ -1,6 +1,9 @@
 package Element
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 // Struct pohon berbasis elemenU
 type Tree struct {
@@ -108,4 +111,37 @@ func BuildTreeWrapper(e Element) Tree {
 	visited := make(map[string]bool)
 	usedRoots := make(map[string]bool)
 	return BuildTree(e, visited, usedRoots, 0)
+}
+
+func TreesEqual(a, b Tree) bool {
+	if a.Root.Root != b.Root.Root ||
+		a.Root.Left != b.Root.Left ||
+		a.Root.Right != b.Root.Right ||
+		a.Root.Tier != b.Root.Tier {
+		return false
+	}
+
+	if len(a.Children) != len(b.Children) {
+		return false
+	}
+
+	for i := range a.Children {
+		if !TreesEqual(a.Children[i], b.Children[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func AreAllTreesUnique(trees []Tree) bool {
+	for i := 0; i < len(trees); i++ {
+		for j := i + 1; j < len(trees); j++ {
+			if TreesEqual(trees[i], trees[j]) {
+				fmt.Println("not unique")
+				return false
+			}
+		}
+	}
+	fmt.Println("unique recipe")
+	return true
 }
