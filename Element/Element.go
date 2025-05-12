@@ -71,7 +71,7 @@ var BaseComponents = map[string]bool{
 	"earth": true,
 	"fire":  true,
 	"water": true,
-	"time":  true,
+	"time":  false,
 }
 
 // Kelompokin berdasarkan rootnya
