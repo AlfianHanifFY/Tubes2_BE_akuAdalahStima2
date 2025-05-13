@@ -130,9 +130,7 @@ func buildAllTreesFromRecipe(recipe Element.Element, recipeMap map[string][]Elem
 				leftTierInt := Element.ParseTier(leftRecipe.Tier)
 				if leftTierInt < tierLimit {
 					subLimit := limit
-					if subLimit > 10 {
-						subLimit = 10
-					}
+
 					leftSubtrees := buildAllTreesFromRecipe(leftRecipe, recipeMap, newVisited, leftTierInt, subLimit, nodesVisited)
 					leftTrees = append(leftTrees, leftSubtrees...)
 					if len(leftTrees) >= subLimit {
