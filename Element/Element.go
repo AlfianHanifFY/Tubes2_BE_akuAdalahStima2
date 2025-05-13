@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// Struct dasar Element
 type Element struct {
 	Root  string `json:"root"`
 	Left  string `json:"Left"`
@@ -16,14 +15,12 @@ type Element struct {
 	Tier  string `json:"Tier"`
 }
 
-// Menyimpan semua elemen dari file agar tidak perlu load berulang
 var allElements []Element
 
 func GetAllElement() []Element {
 	return allElements
 }
 
-// Load dari file JSON hanya sekali
 func LoadElementsFromFile(filename string) error {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -37,7 +34,6 @@ func LoadElementsFromFile(filename string) error {
 	return nil
 }
 
-// Ambil semua elemen dengan root tertentu (case-insensitive)
 func GetElements(rootName string) []Element {
 	var result []Element
 	for _, elem := range allElements {
@@ -56,7 +52,6 @@ func GetElements(rootName string) []Element {
 	return result
 }
 
-// Metode untuk ambil child dari suatu elemen
 func (e Element) LeftChildren() []Element {
 	return GetElements(e.Left)
 }
@@ -103,7 +98,6 @@ func ValidateTree(tree Tree) bool {
 	return true
 }
 
-// Ubah tier ke type integer
 func ParseTier(tierStr string) int {
 	var tier int
 	fmt.Sscanf(tierStr, "%d", &tier)

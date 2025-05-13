@@ -5,25 +5,21 @@ import (
 	"strconv"
 )
 
-// Struct pohon berbasis elemenU
 type Tree struct {
 	Root     Element
 	Children []Tree
 }
 
-// Inisialisasi node pohon dari elemen
 func CreateTree(e Element) Tree {
 	var t Tree
 	t.Root = e
 	return t
 }
 
-// Tambah child ke tree
 func (t *Tree) AddChild(child Tree) {
 	t.Children = append(t.Children, child)
 }
 
-// Ambil nama root dari tree
 func (t Tree) GetRootName() string {
 	return t.Root.Root
 }
@@ -47,14 +43,12 @@ func BuildTree(e Element, visited map[string]bool, usedRoots map[string]bool, de
 		return Tree{}
 	}
 
-	// Buat salinan untuk path saat ini (hindari siklus)
 	pathVisited := make(map[string]bool)
 	for k, v := range visited {
 		pathVisited[k] = v
 	}
 	pathVisited[e.Root] = true
 
-	// Tandai root ini sebagai sudah digunakan
 	usedRoots[e.Root] = true
 
 	tree := CreateTree(e)
