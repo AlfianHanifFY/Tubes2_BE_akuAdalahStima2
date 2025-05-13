@@ -21178,11 +21178,5 @@
     "Left": "Sandwich",
     "Right": "Fabric",
     "Tier": "15"
-  },
-  {
-    "root": "Time",
-    "Left": "",
-    "Right": "",
-    "Tier": "0"
   }
 ]

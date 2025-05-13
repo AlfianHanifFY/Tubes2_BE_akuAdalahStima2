@@ -29,7 +29,6 @@ func Scrapper() {
 
 	var allElements []Element.Element
 
-	// --- Tangani Starting Elements ---
 	startingRegex := regexp.MustCompile(`(?is)<span class="mw-headline" id="Starting_elements">.*?</span>.*?(<table.*?>.*?</table>)`)
 	startingMatch := startingRegex.FindStringSubmatch(html)
 	if len(startingMatch) > 1 {
@@ -38,12 +37,12 @@ func Scrapper() {
 		allElements = append(allElements, elements...)
 	}
 
-	// --- Tangani Tier Elements ---
-	tierTableRegex := regexp.MustCompile(`(?is)<span class="mw-headline" id="(Tier_\d+)_elements">.*?</span>.*?(<table.*?>.*?</table>)`)
+	tierTableRegex := regexp.MustCompile(
+		`(?is)<span class="mw-headline" id="(Tier_\d+)_elements">.*?</span>.*?(<table.*?>.*?</table>)`)
 	tierTableMatches := tierTableRegex.FindAllStringSubmatch(html, -1)
 
 	for _, match := range tierTableMatches {
-		tierRaw := match[1] // e.g., Tier_1
+		tierRaw := match[1]
 		tier := strings.Split(tierRaw, "_")[1]
 		tableHtml := match[2]
 
@@ -51,24 +50,6 @@ func Scrapper() {
 		allElements = append(allElements, elements...)
 	}
 
-	// --- Tangani Unlocking Requirement Table ---
-	unlockingRegex := regexp.MustCompile(`(?is)<span class="mw-headline" id="Element">.*?</span>.*?(<table.*?>.*?</table>)`)
-	unlockingMatch := unlockingRegex.FindStringSubmatch(html)
-	if len(unlockingMatch) > 1 {
-		tableHtml := unlockingMatch[1]
-		elements := extractElementsFromTable(tableHtml, "-1") // Gunakan tier khusus misal "-1" atau "unlock"
-		allElements = append(allElements, elements...)
-	}
-
-	// --- Tambahkan Time dengan Tier 0 secara manual ---
-	allElements = append(allElements, Element.Element{
-		Root:  "Time",
-		Left:  "",
-		Right: "",
-		Tier:  "0", // Time selalu di-set ke tier 0
-	})
-
-	// Simpan sebagai JSON
 	jsonData, err := json.MarshalIndent(allElements, "", "  ")
 	if err != nil {
 		panic(err)
@@ -95,7 +76,6 @@ func extractElementsFromTable(tableHtml string, tier string) []Element.Element {
 			continue
 		}
 
-		// Ambil nama elemen di kolom kiri (Root)
 		elementRegex := regexp.MustCompile(`(?is)<a href="/wiki/[^"]*" title="[^"]*">(.*?)</a>`)
 		elementMatch := elementRegex.FindStringSubmatch(tds[0])
 		root := "UNKNOWN"
@@ -103,11 +83,9 @@ func extractElementsFromTable(tableHtml string, tier string) []Element.Element {
 			root = cleanText(elementMatch[1])
 		}
 
-		// Cek apakah ada komposer di kolom kanan
 		if len(tds) >= 2 {
 			komposers := extractKomposers(tds[1])
 
-			// Jika ada kombinasi (pasangan), simpan sebagai kombinasi
 			if len(komposers) > 0 {
 				for _, pair := range komposers {
 					elements = append(elements, Element.Element{
@@ -120,8 +98,6 @@ func extractElementsFromTable(tableHtml string, tier string) []Element.Element {
 				continue
 			}
 
-			// Jika tidak ada pasangan, tapi masih dalam daftar unlock seperti "Time"
-			// maka asumsikan elemen mandiri, tier 0
 			elements = append(elements, Element.Element{
 				Root:  root,
 				Left:  "",
@@ -131,7 +107,6 @@ func extractElementsFromTable(tableHtml string, tier string) []Element.Element {
 			continue
 		}
 
-		// Jika tidak ada kolom kanan, simpan sebagai elemen mandiri
 		elements = append(elements, Element.Element{
 			Root:  root,
 			Left:  "",
@@ -143,13 +118,11 @@ func extractElementsFromTable(tableHtml string, tier string) []Element.Element {
 	return elements
 }
 
-// Bersihkan teks
 func cleanText(s string) string {
 	re := regexp.MustCompile(`\s+`)
 	return strings.TrimSpace(re.ReplaceAllString(s, " "))
 }
 
-// Ambil 2 komposer dari <li> dan abaikan <span>
 func extractKomposers(td string) [][]string {
 	liRegex := regexp.MustCompile(`(?is)<li[^>]*>.*?</li>`)
 	liMatches := liRegex.FindAllString(td, -1)
