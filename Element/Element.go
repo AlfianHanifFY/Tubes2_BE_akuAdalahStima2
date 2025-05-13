@@ -83,19 +83,17 @@ func BuildRecipeMap(recipes []Element) map[string][]Element {
 	return recipeMap
 }
 
-// Check if an item is a base component
+// Cek apakah base component
 func IsBaseComponent(item string) bool {
 	return BaseComponents[strings.ToLower(item)]
 }
 
-// Check if all leaf nodes are base components
+// Validasi bahwa leaf node adalah base component
 func ValidateTree(tree Tree) bool {
-	// If this is a leaf node
 	if len(tree.Children) == 0 {
 		return IsBaseComponent(tree.Root.Root)
 	}
 
-	// Check all children
 	for _, child := range tree.Children {
 		if !ValidateTree(child) {
 			return false
@@ -105,6 +103,7 @@ func ValidateTree(tree Tree) bool {
 	return true
 }
 
+// Ubah tier ke type integer
 func ParseTier(tierStr string) int {
 	var tier int
 	fmt.Sscanf(tierStr, "%d", &tier)

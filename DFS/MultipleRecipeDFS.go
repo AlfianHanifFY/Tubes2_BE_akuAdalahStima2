@@ -6,7 +6,6 @@ import (
 	"stima-2-be/Element"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -16,24 +15,26 @@ type MetricsResult struct {
 	DurationHuman string `json:"duration_human"`
 }
 
+// Menghitung jumlah node pada 1 tree
 func CountNodes(tree Element.Tree) int64 {
-	count := int64(1) // Count the root
+	count := int64(1)
 	for _, child := range tree.Children {
 		count += CountNodes(child)
 	}
 	return count
 }
-func cloneMap(original map[string]bool) map[string]bool {
+
+// Untuk clone map visited
+func CloneVisited(visited map[string]bool) map[string]bool {
 	copy := make(map[string]bool)
-	for k, v := range original {
+	for k, v := range visited {
 		copy[k] = v
 	}
 	return copy
 }
 
-func buildTreesControlled(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
-	atomic.AddInt64(nodesVisited, 1)
-
+// Cari Tree yang Valid
+func BuildTrees(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int) []Element.Tree {
 	if Element.IsBaseComponent(root) {
 		return []Element.Tree{
 			{
@@ -81,10 +82,10 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 		// Proses kiri secara paralel
 		go func() {
 			defer wg.Done()
-			leftChan <- buildTreesControlled(left, recipeMap, cloneMap(visited), tierInt, limit, nodesVisited)
+			leftChan <- BuildTrees(left, recipeMap, CloneVisited(visited), tierInt, limit)
 		}()
 
-		// Proses kanan setelah dapat hasil kiri
+		// Proses kanan setelah dapat hasil subtree kiri
 		go func() {
 			defer wg.Done()
 			leftResult := <-leftChan
@@ -94,7 +95,7 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 				return
 			}
 			rightLimit := int(math.Ceil(float64(limit) / float64(len(leftResult))))
-			rightChan <- buildTreesControlled(right, recipeMap, cloneMap(visited), tierInt, rightLimit, nodesVisited)
+			rightChan <- BuildTrees(right, recipeMap, CloneVisited(visited), tierInt, rightLimit)
 		}()
 
 		wg.Wait()
@@ -104,11 +105,11 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 			continue
 		}
 
-		for _, lt := range leftTrees {
-			for _, rt := range rightTrees {
+		for _, leftT := range leftTrees {
+			for _, rightT := range rightTrees {
 				tree := Element.Tree{
 					Root:     recipe,
-					Children: []Element.Tree{lt, rt},
+					Children: []Element.Tree{leftT, rightT},
 				}
 				result = append(result, tree)
 				if len(result) >= limit {
@@ -124,14 +125,15 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 	return result
 }
 
+// Perhitungan node dan pengecekan kondisi tree yang dapat dibangun (base/not)
 func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
 	startTime := time.Now()
 	var nodesVisited int64 = 0
-	var x bool
+	var baseComp bool
 	name = strings.ToLower(name)
 	var trees []Element.Tree
 	if Element.IsBaseComponent(name) {
-		x = true
+		baseComp = true
 		trees = []Element.Tree{
 			{
 				Root: Element.Element{
@@ -144,14 +146,19 @@ func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Elemen
 			},
 		}
 	} else {
-		x = false
-		trees = buildTreesControlled(name, recipeMap, map[string]bool{}, math.MaxInt32, count, &nodesVisited)
+		baseComp = false
+		trees = BuildTrees(name, recipeMap, map[string]bool{}, math.MaxInt32, count)
 	}
 
 	if len(trees) > count {
 		trees = trees[:count]
 	}
-	if x {
+
+	for _, tree := range trees {
+		nodesVisited += CountNodes(tree)
+	}
+
+	if baseComp {
 		duration := time.Since(startTime)
 		metrics := MetricsResult{
 			NodesVisited:  1,
@@ -168,6 +175,7 @@ func MultipleRecipeConcurrent(name string, recipeMap map[string][]Element.Elemen
 	}
 }
 
+// Convenience method untuk manggil fungsi lain
 func MultipleRecipe(name string, recipeMap map[string][]Element.Element, count int) ([]Element.Tree, MetricsResult) {
 	return MultipleRecipeConcurrent(name, recipeMap, count)
 }
