@@ -37,6 +37,7 @@ func (t Tree) GetTier() int {
 	return i
 }
 
+// ini buat nge tes api endpoint aja
 func BuildTree(e Element, visited map[string]bool, usedRoots map[string]bool, depth int) Tree {
 	if depth > 100 {
 		return Tree{}
