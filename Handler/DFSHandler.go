@@ -22,7 +22,7 @@ func DFSHandler(w http.ResponseWriter, r *http.Request) {
 	recipeMap := Element.BuildRecipeMap(Element.GetAllElement())
 	result, info := dfs.MultipleRecipe(name, recipeMap, count)
 
-	fmt.Print(result)
+	Element.AreAllTreesUnique(result)
 
 	response := []interface{}{info, result}
 

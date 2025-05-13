@@ -3,7 +3,6 @@ package dfs
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"stima-2-be/Element"
 	"strings"
 	"sync"
@@ -24,9 +23,17 @@ func CountNodes(tree Element.Tree) int64 {
 	}
 	return count
 }
+func cloneMap(original map[string]bool) map[string]bool {
+	copy := make(map[string]bool)
+	for k, v := range original {
+		copy[k] = v
+	}
+	return copy
+}
 
 func buildTreesControlled(root string, recipeMap map[string][]Element.Element, visited map[string]bool, tierLimit int, limit int, nodesVisited *int64) []Element.Tree {
 	atomic.AddInt64(nodesVisited, 1)
+
 	if Element.IsBaseComponent(root) {
 		return []Element.Tree{
 			{
@@ -54,11 +61,6 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 	visited[root] = true
 	defer func() { visited[root] = false }()
 
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, runtime.NumCPU())
-	var done int32 = 0
-
 	for _, recipe := range recipes {
 		tierInt := Element.ParseTier(recipe.Tier)
 		if tierInt >= tierLimit {
@@ -68,49 +70,54 @@ func buildTreesControlled(root string, recipeMap map[string][]Element.Element, v
 		left := strings.ToLower(recipe.Left)
 		right := strings.ToLower(recipe.Right)
 
-		leftTrees := buildTreesControlled(left, recipeMap, visited, tierInt, limit, nodesVisited)
-		if len(leftTrees) == 0 {
-			continue
-		}
+		var leftTrees, rightTrees []Element.Tree
+		var wg sync.WaitGroup
 
-		rightLimit := int(math.Ceil(float64(limit) / float64(len(leftTrees))))
-		rightTrees := buildTreesControlled(right, recipeMap, visited, tierInt, rightLimit, nodesVisited)
-		if len(rightTrees) == 0 {
+		leftChan := make(chan []Element.Tree, 1)
+		rightChan := make(chan []Element.Tree, 1)
+
+		wg.Add(2)
+
+		// Proses kiri secara paralel
+		go func() {
+			defer wg.Done()
+			leftChan <- buildTreesControlled(left, recipeMap, cloneMap(visited), tierInt, limit, nodesVisited)
+		}()
+
+		// Proses kanan setelah dapat hasil kiri
+		go func() {
+			defer wg.Done()
+			leftResult := <-leftChan
+			leftTrees = leftResult
+			if len(leftResult) == 0 {
+				rightChan <- nil
+				return
+			}
+			rightLimit := int(math.Ceil(float64(limit) / float64(len(leftResult))))
+			rightChan <- buildTreesControlled(right, recipeMap, cloneMap(visited), tierInt, rightLimit, nodesVisited)
+		}()
+
+		wg.Wait()
+		rightTrees = <-rightChan
+
+		if len(leftTrees) == 0 || len(rightTrees) == 0 {
 			continue
 		}
 
 		for _, lt := range leftTrees {
 			for _, rt := range rightTrees {
-				if atomic.LoadInt32(&done) == 1 {
-					break
+				tree := Element.Tree{
+					Root:     recipe,
+					Children: []Element.Tree{lt, rt},
 				}
-				semaphore <- struct{}{}
-				wg.Add(1)
-				go func(lt, rt Element.Tree, recipe Element.Element) {
-					defer func() {
-						<-semaphore
-						wg.Done()
-					}()
-					tree := Element.Tree{
-						Root:     recipe,
-						Children: []Element.Tree{lt, rt},
-					}
-					mu.Lock()
-					if atomic.LoadInt32(&done) == 0 {
-						result = append(result, tree)
-						if len(result) >= limit {
-							atomic.StoreInt32(&done, 1)
-						}
-					}
-					mu.Unlock()
-				}(lt, rt, recipe)
+				result = append(result, tree)
+				if len(result) >= limit {
+					return result
+				}
 			}
 		}
-		if atomic.LoadInt32(&done) == 1 {
-			break
-		}
 	}
-	wg.Wait()
+
 	if len(result) > limit {
 		result = result[:limit]
 	}
