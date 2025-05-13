@@ -1,9 +1,8 @@
-````markdown
 # Tubes2_BE_akuAdalahStima2
 
 Repositori ini berisi program back-end tugas besar 2 akuAdalahStima2. Program ini bertugas sebagai endpoint API dan digunakan untuk proses komputasi algortima dfs, bfs, dan scraper.
 
-## 📋 Prerequisite
+## Prerequisite
 
 Sebelum memulai, pastikan Anda telah menginstal:
 
@@ -16,9 +15,8 @@ Untuk memastikan Docker telah terinstal, jalankan perintah berikut:
 docker --version
 docker compose version
 ```
-````
 
-## 🔄 Clone Repository
+## Clone Repository
 
 Clone repository ini ke dalam komputer Anda:
 
@@ -27,13 +25,13 @@ git clone https://github.com/AlfianHanifFY/Tubes2_BE_akuAdalahStima2.git
 cd nama-repo
 ```
 
-## 🛠️ Build Docker
+## Build Docker
 
 ```bash
 docker compose build
 ```
 
-## ▶️ Menjalankan Aplikasi
+## Menjalankan Aplikasi
 
 Jalankan container:
 
@@ -47,7 +45,9 @@ Gunakan flag `-d` untuk menjalankan dalam mode _detached_:
 docker compose up -d
 ```
 
-## ⏹️ Menghentikan Aplikasi
+Program akan berjalan pada `localhost:8080` dan berfungsi sebagai endpoint API untuk program front-end
+
+## Menghentikan Aplikasi
 
 Untuk menghentikan dan menghapus container:
 
@@ -57,7 +57,7 @@ docker compose down
 
 ---
 
-## 📂 Struktur Proyek
+## Struktur Proyek
 
 ```text
 .
@@ -91,10 +91,3 @@ docker compose down
 | Alfian Hanif Fitria Yustanto | 13523073 |
 | Heleni Gratia M. Tampubolon  | 13523107 |
 | Ahmad Wicaksono              | 13523121 |
-
-```
-
----
-
-
-```
