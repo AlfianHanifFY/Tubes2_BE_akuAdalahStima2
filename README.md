@@ -22,7 +22,7 @@ Clone repository ini ke dalam komputer Anda:
 
 ```bash
 git clone https://github.com/AlfianHanifFY/Tubes2_BE_akuAdalahStima2.git
-cd nama-repo
+cd Tubes2_BE_akuAdalahStima2
 ```
 
 ## Build Docker
