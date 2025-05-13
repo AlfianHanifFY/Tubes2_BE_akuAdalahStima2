@@ -4,6 +4,14 @@ Repositori ini berisi program back-end tugas besar 2 akuAdalahStima2. Program in
 
 ## Description
 
+Program ini memanfaatkan algoritma DFS dan BFS untuk mencari resep dalam pembuatan suatu elemen pada permainan https://littlealchemy2.com
+
+Algoritma DFS (Depth-First Search) diterapkan secara iteratif untuk menelusuri kombinasi elemen dari sebuah pohon resep. Proses eksplorasi dimulai dari node target, dengan memprioritaskan bagian subtree kiri (left) terlebih dahulu secara paralel, lalu dilanjutkan ke subtree kanan (right).
+
+Untuk menjamin proses backtracking yang aman, setiap node memiliki salinan status visited sendiri menggunakan struktur map yang di-clone. Algoritma ini juga dioptimalkan dengan membatasi jumlah kombinasi subtree kiri yang valid hingga mencapai jumlah resep yang diminta pengguna. Jika batas tercapai, pencarian di subtree kiri dihentikan dan hanya satu kombinasi dari subtree kanan yang diproses untuk menyeimbangkan total hasil. Suatu subtree dianggap valid jika menghasilkan base element (air, earth, fire, water).
+
+Algoritma BFS diterapkan untuk membangun pohon resep secara bertahap berdasarkan kedalaman dari elemen target. Sistem akan mengeksplorasi berbagai kombinasi bahan dengan pendekatan level-by-level, sehingga seluruh node pada level tertentu diselesaikan sebelum lanjut ke level berikutnya. Setiap kombinasi yang valid kemudian disusun menjadi pohon resep hingga batas jumlah yang ditentukan tercapai. Proses ini juga dilengkapi dengan dukungan multithreading untuk meningkatkan performa, serta pencatatan metrik seperti jumlah simpul yang dikunjungi dan durasi eksekusi.
+
 ## Prerequisite
 
 Sebelum memulai, pastikan Anda telah menginstal:
